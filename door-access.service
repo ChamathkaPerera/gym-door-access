@@ -1,0 +1,32 @@
+[Unit]
+Description=Lumora Door Access Face Recognition System
+Documentation=https://github.com/lumora/door-access
+After=multi-user.target network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/door-access
+ExecStart=/home/pi/door-access/venv/bin/python main.py
+Restart=always
+RestartSec=5
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+Environment=HOME=/home/pi
+
+# Security
+NoNewPrivileges=false
+ProtectSystem=false
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=door-access
+
+[Install]
+WantedBy=multi-user.target

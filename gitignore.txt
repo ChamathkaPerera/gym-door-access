@@ -1,0 +1,25 @@
+# Data
+data/
+*.db
+*.pkl
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+
+# Firebase credentials
+config/firebase_credentials.json
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

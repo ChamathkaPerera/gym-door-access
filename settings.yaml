@@ -1,0 +1,81 @@
+# =============================================================================
+# Door Access System Configuration
+# =============================================================================
+
+# --- General ---
+system:
+  name: "Lumora Door Access System"
+  simulate_gpio: true        # Set true for dev on laptop (no real GPIO)
+  simulate_camera: false      # Set true to use test images instead of USB cam
+  log_level: "INFO"           # DEBUG, INFO, WARNING, ERROR
+
+# --- GPIO Pin Assignments (BCM numbering) ---
+gpio:
+  pir_sensor: 17
+  relay: 27
+  buzzer: 22
+  outside_button: 23
+  inside_button: 24
+  flash_led: 25
+  relay_active_duration: 5    # seconds to keep relay open
+  buzzer_alert_duration: 3    # seconds for buzzer alert
+  debounce_time: 300          # milliseconds for button debounce
+
+# --- Camera ---
+camera:
+  device_index: 0             # /dev/video0
+  resolution_width: 640
+  resolution_height: 480
+  warmup_time: 1.0            # seconds to let camera adjust
+
+# --- Face Recognition ---
+face_recognition:
+  model: "hog"                # "hog" (CPU fast) or "cnn" (GPU, slow on RPi)
+  tolerance: 0.5              # Lower = stricter matching (0.4-0.6 range)
+  num_jitters: 1              # Re-sample face N times (higher = slower but accurate)
+  enrollment_samples: 5       # Number of face images to capture during enrollment
+  min_face_size: 40           # Minimum face size in pixels to detect
+  encodings_cache_file: "data/encodings_cache.pkl"
+
+# --- Fingerprint Sensor (R503) ---
+fingerprint:
+  uart_port: "/dev/ttyS0"    # RPi UART (GPIO14=TX, GPIO15=RX)
+  baud_rate: 57600
+  timeout: 2                  # seconds for UART read timeout
+  security_level: 3           # 1-5, higher = stricter matching
+  max_templates: 200          # Max fingerprints stored on sensor
+  led_colors:
+    scanning: "blue"
+    success: "green"
+    fail: "red"
+    enroll: "purple"
+
+# --- PIR Motion Detection ---
+pir:
+  idle_timeout: 30            # seconds of no motion before going idle
+  cooldown: 2                 # seconds between PIR triggers
+  active_check_interval: 0.1  # seconds between PIR polls in idle mode
+
+# --- Database ---
+database:
+  path: "data/door_access.db"
+  backup_interval: 86400      # seconds between automatic DB backups (24hr)
+
+# --- Firebase ---
+firebase:
+  enabled: true
+  credentials_path: "config/firebase_credentials.json"
+  database_url: ""            # e.g., "https://your-project.firebaseio.com"
+  storage_bucket: ""          # e.g., "your-project.appspot.com"
+  sync_interval: 60           # seconds between sync attempts
+  max_retry_delay: 300        # max seconds for exponential backoff
+  upload_images: true         # Upload captured face images to Firebase Storage
+
+# --- Logging ---
+logging:
+  log_file: "data/logs/system.log"
+  access_log_file: "data/logs/access.log"
+  max_log_size_mb: 10
+  backup_count: 5
+  save_face_images: true      # Save captured face images locally
+  face_images_dir: "data/faces"
