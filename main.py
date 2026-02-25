@@ -107,17 +107,12 @@ class DoorAccessSystem:
             logger.info("No encodings cache found — using DB-loaded encodings")
 
         # Fingerprint Sensor
-        if simulate:
-            self.fingerprint = SimulatedFingerprintModule(self.config.get("fingerprint", {}))
-        else:
-            self.fingerprint = FingerprintModule(self.config.get("fingerprint", {}))
-
-        fp_connected = self.fingerprint.connect()
-        if not fp_connected:
-            logger.warning("Fingerprint sensor not connected — fingerprint auth disabled")
+        self.fingerprint = None
+        logger.info("R&D Mode: Fingerprint auth explicitly disabled")
 
         # GPIO Controller
-        self.gpio = GPIOController(self.config.get("gpio", {}), simulate=simulate)
+        self.gpio = None
+        logger.info("R&D Mode: GPIO/Hardware disabled")
 
         # User Manager
         self.user_manager = UserManager(self.db, self.face, self.fingerprint)
@@ -202,10 +197,11 @@ class DoorAccessSystem:
         signal.signal(signal.SIGTERM, self._signal_handler)
 
         # Set up button interrupt callbacks
-        self.gpio.setup_button_callbacks(
-            outside_callback=self._on_outside_button,
-            inside_callback=self._on_inside_button
-        )
+        if self.gpio:
+            self.gpio.setup_button_callbacks(
+                outside_callback=self._on_outside_button,
+                inside_callback=self._on_inside_button
+            )
 
         pir_config = self.config.get("pir", {})
         idle_timeout = pir_config.get("idle_timeout", 30)
@@ -248,13 +244,9 @@ class DoorAccessSystem:
         self._shutdown()
 
     def _handle_idle(self, poll_interval):
-        """IDLE state — poll PIR for motion."""
-        if self.gpio.read_pir():
-            logger.info("Motion detected — activating detection")
-            self.gpio.flash_on()
-            self.state = State.DETECTING
-        else:
-            time.sleep(poll_interval)
+        """IDLE state — skip PIR, go directly to detecting."""
+        logger.info("R&D Mode: Bypassing motion detection")
+        self.state = State.DETECTING
 
     def _handle_detecting(self):
         """DETECTING state — capture face and attempt recognition."""
@@ -274,14 +266,16 @@ class DoorAccessSystem:
             if frame is not None:
                 image_path = self.face.save_face_image(frame, user["id"])
 
+            print(f"\n*** Access Granted: {user['name']} (Confidence: {confidence:.2f}) ***\n")
             self._grant_access(user, "face", confidence, image_path)
         else:
-            # Face failed — save unknown face image and try fingerprint
+            # Face failed — save unknown face image
             if frame is not None:
                 self.face.save_face_image(frame, "unknown")
 
-            logger.info("Face not recognized — switching to fingerprint scan")
-            self.state = State.FINGERPRINT_CHECK
+            logger.info("Face not recognized — Access Denied")
+            print("\n*** Access Denied: Face not recognized ***\n")
+            self.state = State.DENIED
 
     def _handle_fingerprint(self):
         """FINGERPRINT_CHECK state — scan fingerprint."""
@@ -300,11 +294,12 @@ class DoorAccessSystem:
     def _handle_denied(self):
         """DENIED state — access denied, reset after delay."""
         logger.info("Access DENIED — no match found")
-        self.gpio.ring_buzzer("denied")
+        if self.gpio:
+            self.gpio.ring_buzzer("denied")
+            self.gpio.flash_off()
         self.access_logger.log_access_denied("biometric")
 
         # Turn off flash and camera
-        self.gpio.flash_off()
         self._close_camera()
 
         # Wait before returning to idle
@@ -319,9 +314,10 @@ class DoorAccessSystem:
         )
 
         # Activate relay (unlock door)
-        self.gpio.activate_relay()
-        self.gpio.ring_buzzer("success")
-        self.gpio.flash_off()
+        if self.gpio:
+            self.gpio.activate_relay()
+            self.gpio.ring_buzzer("success")
+            self.gpio.flash_off()
 
         # Log the event
         self.access_logger.log_access_granted(
@@ -357,10 +353,12 @@ class DoorAccessSystem:
         self._close_camera()
 
         # Disconnect fingerprint sensor
-        self.fingerprint.disconnect()
+        if self.fingerprint:
+            self.fingerprint.disconnect()
 
         # Turn off all outputs and clean up GPIO
-        self.gpio.cleanup()
+        if self.gpio:
+            self.gpio.cleanup()
 
         # Final sync attempt
         try:
