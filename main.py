@@ -223,8 +223,13 @@ class DoorAccessSystem:
 
                 elif self.state == State.DOOR_OPEN:
                     # Door is open — wait for relay to deactivate
-                    time.sleep(0.5)
-                    if not self.gpio.is_relay_active():
+                    if self.gpio is not None:
+                        time.sleep(0.5)
+                        if not self.gpio.is_relay_active():
+                            self.state = State.IDLE
+                    else:
+                        logger.info("R&D Mode: Simulating door open delay")
+                        time.sleep(2.0)
                         self.state = State.IDLE
 
                 elif self.state == State.DENIED:
